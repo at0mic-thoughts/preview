@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>at0mic thoughts — findings on AI agent execution</title>
+    <meta name="description" content="Benchmarks, tradeoffs, and things that actually work when running AI agents in production.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0a0a0f;
+            --surface: #12121a;
+            --surface-2: #1a1a2e;
+            --border: #2a2a3e;
+            --text: #e8e8f0;
+            --text-dim: #8888a0;
+            --accent: #6c63ff;
+            --accent-glow: rgba(108, 99, 255, 0.15);
+            --green: #22c55e;
+            --green-dim: rgba(34, 197, 94, 0.15);
+            --cyan: #06b6d4;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Hero */
+        .hero {
+            padding: 100px 0 40px;
+            text-align: center;
+            position: relative;
+        }
+
+        .hero::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 600px;
+            height: 600px;
+            background: radial-gradient(circle, var(--accent-glow) 0%, transparent 70%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .hero > * { position: relative; z-index: 1; }
+
+        .logo {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 14px;
+            color: var(--accent);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 24px;
+            display: inline-block;
+        }
+
+        .logo span {
+            color: var(--text-dim);
+        }
+
+        h1 {
+            font-size: clamp(40px, 5vw, 64px);
+            font-weight: 700;
+            line-height: 1.05;
+            margin-bottom: 24px;
+            letter-spacing: -1.5px;
+        }
+
+        h1 .dim { color: var(--text-dim); font-weight: 300; }
+
+        .subtitle {
+            font-size: 18px;
+            color: var(--text-dim);
+            max-width: 560px;
+            margin: 0 auto 60px;
+            line-height: 1.7;
+        }
+
+        /* Divider */
+        .divider {
+            width: 60px;
+            height: 2px;
+            background: var(--accent);
+            margin: 0 auto 60px;
+            opacity: 0.5;
+        }
+
+        /* Posts */
+        .posts-section {
+            padding: 0 0 80px;
+        }
+
+        .section-label {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: var(--accent);
+            margin-bottom: 32px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .post-card {
+            display: block;
+            text-decoration: none;
+            color: inherit;
+            padding: 36px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .post-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--accent), var(--cyan));
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .post-card:hover {
+            border-color: #3a3a5e;
+            transform: translateY(-2px);
+        }
+
+        .post-card:hover::before {
+            opacity: 1;
+        }
+
+        .post-meta {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .post-date {
+            font-size: 13px;
+            color: var(--text-dim);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .post-tag {
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--green);
+            background: var(--green-dim);
+            padding: 3px 10px;
+            border-radius: 100px;
+            font-weight: 500;
+        }
+
+        .post-title {
+            font-size: 26px;
+            font-weight: 600;
+            line-height: 1.25;
+            margin-bottom: 12px;
+            letter-spacing: -0.5px;
+        }
+
+        .post-desc {
+            font-size: 16px;
+            color: var(--text-dim);
+            line-height: 1.7;
+            max-width: 720px;
+        }
+
+        .post-stats {
+            display: flex;
+            gap: 24px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+        }
+
+        .post-stat {
+            display: flex;
+            align-items: baseline;
+            gap: 6px;
+        }
+
+        .post-stat .num {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .post-stat .lbl {
+            font-size: 13px;
+            color: var(--text-dim);
+        }
+
+        .read-arrow {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 20px;
+            font-size: 14px;
+            color: var(--accent);
+            font-weight: 500;
+        }
+
+        .read-arrow svg {
+            transition: transform 0.2s;
+        }
+
+        .post-card:hover .read-arrow svg {
+            transform: translateX(4px);
+        }
+
+        /* Footer */
+        footer {
+            padding: 40px 0;
+            text-align: center;
+            border-top: 1px solid var(--border);
+        }
+
+        .footer-text {
+            font-size: 13px;
+            color: #333;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .footer-text a {
+            color: var(--text-dim);
+            text-decoration: none;
+        }
+
+        .footer-text a:hover {
+            color: var(--accent);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .hero { padding: 60px 0 30px; }
+            .post-card { padding: 24px; }
+            .post-title { font-size: 22px; }
+            .post-stats { flex-wrap: wrap; gap: 16px; }
+            .post-stat .num { font-size: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <section class="hero">
+            <div class="logo">at0mic <span>//</span> thoughts</div>
+            <h1>What actually works<br><span class="dim">when running AI agents</span></h1>
+            <p class="subtitle">Benchmarks, tradeoffs, and hard-won lessons from building with AI agents in production. No hype, just data.</p>
+        </section>
+
+        <div class="divider"></div>
+
+        <section class="posts-section">
+            <div class="section-label">Findings</div>
+
+            <a class="post-card" href="./structured-ai-agent-execution/">
+                <div class="post-meta">
+                    <span class="post-date">Mar 2026</span>
+                    <span class="post-tag">benchmark</span>
+                </div>
+                <h2 class="post-title">Structured specs beat prose for AI agent execution</h2>
+                <p class="post-desc">We gave five models the same multi-step workflow as both a JSON spec and a prose paragraph. JSON produced 37% better execution quality and eliminated improvisation entirely.</p>
+                <div class="post-stats">
+                    <div class="post-stat">
+                        <span class="num">37%</span>
+                        <span class="lbl">quality improvement</span>
+                    </div>
+                    <div class="post-stat">
+                        <span class="num">5</span>
+                        <span class="lbl">models tested</span>
+                    </div>
+                    <div class="post-stat">
+                        <span class="num">0</span>
+                        <span class="lbl">improvisation with JSON</span>
+                    </div>
+                </div>
+                <div class="read-arrow">
+                    Read the full analysis
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+            </a>
+        </section>
+
+        <footer>
+            <p class="footer-text">at0mic thoughts · 2026 · <a href="https://github.com/at0mic-thoughts">github</a></p>
+        </footer>
+    </div>
+</body>
+</html>
